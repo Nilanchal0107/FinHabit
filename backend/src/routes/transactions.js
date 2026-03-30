@@ -81,6 +81,19 @@ router.get('/transactions', authenticate, async (req, res) => {
         amount = 0;
       }
 
+      // Resolve date regardless of storage type:
+      //   - Firestore Timestamp → .toDate() → .toISOString()
+      //   - plain JS Date       → .toISOString() directly
+      //   - ISO string          → return as-is
+      //   - anything else       → null
+      const resolveDate = (val) => {
+        if (!val) return null;
+        if (typeof val.toDate === 'function') return val.toDate().toISOString();  // Firestore Timestamp
+        if (val instanceof Date) return val.toISOString();                        // plain JS Date
+        if (typeof val === 'string') return val;                                  // already ISO string
+        return null;
+      };
+
       return {
         id:              doc.id,
         amount,                              // ← plaintext number, safe for frontend
@@ -88,11 +101,11 @@ router.get('/transactions', authenticate, async (req, res) => {
         category:        data.category  || 'Others',
         transactionType: data.transactionType || 'debit',
         paymentMethod:   data.paymentMethod   || 'UPI',
-        date:            data.date?.toDate?.()?.toISOString() || null,
+        date:            resolveDate(data.date),
         confidence:      data.confidence  ?? 0,
         parsingTier:     data.parsingTier ?? 1,
         notes:           data.notes       || null,
-        createdAt:       data.createdAt?.toDate?.()?.toISOString() || null,
+        createdAt:       resolveDate(data.createdAt),
       };
     });
 

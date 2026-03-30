@@ -241,13 +241,21 @@ function ManualEntryTab({ onClose }) {
     setSaving(true);
     try {
       const catEntry = DEFAULT_CATEGORIES.find((c) => c.id === form.category);
+      // Build a proper local datetime from the date input:
+      //   - If the selected date is today → use the actual current time so the
+      //     timestamp is accurate (e.g., "29 Mar, 20:54" not "29 Mar, 00:00")
+      //   - Otherwise → use noon local time so UTC conversion never rolls the
+      //     date backward for IST users (UTC+5:30)
+      const today = new Date().toISOString().split('T')[0];
+      const txnDate = form.date === today
+        ? new Date().toISOString()                          // right now (today's actual time)
+        : new Date(form.date + 'T12:00:00').toISOString(); // noon local for past/future dates
+
       await apiConfirmTransaction({
         amount:          parseFloat(form.amount),
         merchant:        form.merchant.trim(),
         category:        catEntry?.name || 'Others',
-        // IMPORTANT: new Date("YYYY-MM-DD") parses as UTC midnight → wrong IST time.
-        // Appending T00:00 forces JavaScript to treat it as local (IST) midnight instead.
-        date:            new Date(form.date + 'T00:00').toISOString(),
+        date:            txnDate,
         paymentMethod:   form.paymentMethod,
         transactionType: form.transactionType,
         notes:           form.notes.trim() || undefined,

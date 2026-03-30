@@ -81,6 +81,22 @@ export const fetchInsights = (period) =>
 export const fetchTransactions = (period = 'month', limit = 200) =>
   request(`/transactions?period=${period}&limit=${limit}`, { method: 'GET' });
 
+/** GET /api/transactions — all time, up to 500 (for Transactions page) */
+export const fetchAllTransactions = () =>
+  request(`/transactions?period=all&limit=500`, { method: 'GET' });
+
+/** DELETE /api/transactions/:id */
+export const deleteTransaction = (id) =>
+  request(`/transactions/${id}`, { method: 'DELETE' });
+
+/** PATCH /api/transactions/:id — update category and/or notes */
+export const updateTransaction = (id, updates) =>
+  request(`/transactions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+
+
 /**
  * POST /api/chat — returns a ReadableStream for SSE.
  * The caller is responsible for reading the stream.

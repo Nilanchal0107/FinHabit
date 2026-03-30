@@ -6,6 +6,8 @@ import { standardLimiter } from './middleware/rateLimit.js';
 import parseSMSRouter from './routes/parseSMS.js';
 import confirmTransactionRouter from './routes/confirmTransaction.js';
 import transactionsRouter from './routes/transactions.js';
+import deleteTransactionRouter from './routes/deleteTransaction.js';
+import updateTransactionRouter from './routes/updateTransaction.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -55,6 +57,8 @@ app.get('/health', (req, res) => {
 app.use('/api', parseSMSRouter);
 app.use('/api', confirmTransactionRouter);
 app.use('/api', transactionsRouter);
+app.use('/api', deleteTransactionRouter);
+app.use('/api', updateTransactionRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
