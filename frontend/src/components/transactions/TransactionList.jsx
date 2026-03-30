@@ -12,21 +12,19 @@ import TransactionItem from './TransactionItem.jsx';
 
 function dateLabel(dateStr) {
   if (!dateStr) return 'Unknown date';
-  const d    = new Date(dateStr);
-  const now  = new Date();
-  const diff = Math.floor((now - d) / 86_400_000);
+  const d = new Date(dateStr);
 
-  const sameDay = (a, b) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth()    === b.getMonth()    &&
-    a.getDate()     === b.getDate();
+  // Compare as IST calendar dates (YYYY-MM-DD strings) to avoid timezone issues
+  const dIST   = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const todayIST     = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const yday         = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
-  if (sameDay(d, now)) return 'Today';
+  if (dIST === todayIST) return 'Today';
+  if (dIST === yday)     return 'Yesterday';
 
-  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-  if (sameDay(d, yesterday)) return 'Yesterday';
-
-  if (diff < 7) {
+  // Within last 7 days → weekday name
+  const diffDays = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (diffDays < 7) {
     return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long' });
   }
   return d.toLocaleDateString('en-IN', {

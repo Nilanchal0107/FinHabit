@@ -9,24 +9,37 @@ import { DEFAULT_CATEGORIES } from '@utils/categories.js';
 
 // ── date preset helpers ───────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// en-CA locale gives YYYY-MM-DD format; timeZone ensures IST calendar date
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
 
 function presetRange(id) {
-  const now = new Date();
+  // All date arithmetic done in IST (UTC+5:30)
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
   switch (id) {
     case 'week': {
-      const s = new Date(now); s.setDate(s.getDate() - 6);
-      return { start: s.toISOString().split('T')[0], end: todayStr() };
+      const s = new Date(nowIST); s.setDate(s.getDate() - 6);
+      return {
+        start: s.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+        end:   todayStr(),
+      };
     }
     case 'month': {
-      const s = new Date(now.getFullYear(), now.getMonth(), 1);
-      const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return { start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0] };
+      const s = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
+      const e = new Date(nowIST.getFullYear(), nowIST.getMonth() + 1, 0);
+      return {
+        start: s.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+        end:   e.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+      };
     }
     case 'last-month': {
-      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const e = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0] };
+      const s = new Date(nowIST.getFullYear(), nowIST.getMonth() - 1, 1);
+      const e = new Date(nowIST.getFullYear(), nowIST.getMonth(), 0);
+      return {
+        start: s.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+        end:   e.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+      };
     }
     default: return null;
   }

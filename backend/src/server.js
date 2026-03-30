@@ -8,6 +8,9 @@ import confirmTransactionRouter from './routes/confirmTransaction.js';
 import transactionsRouter from './routes/transactions.js';
 import deleteTransactionRouter from './routes/deleteTransaction.js';
 import updateTransactionRouter from './routes/updateTransaction.js';
+import insightsRouter from './routes/insights.js';
+import triggerInsightsRouter from './routes/triggerInsights.js';
+import chatRouter from './routes/chat.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -28,7 +31,7 @@ app.use((req, res, next) => {
   if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
     res.header('Access-Control-Allow-Origin', origin || '*');
   }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
 
@@ -59,6 +62,9 @@ app.use('/api', confirmTransactionRouter);
 app.use('/api', transactionsRouter);
 app.use('/api', deleteTransactionRouter);
 app.use('/api', updateTransactionRouter);
+app.use('/api', insightsRouter);
+app.use('/api', triggerInsightsRouter);
+app.use('/api', chatRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

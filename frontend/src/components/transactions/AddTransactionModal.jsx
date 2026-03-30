@@ -216,17 +216,17 @@ function ShareTargetTab() {
 
 // ─── Tab C — Manual Entry ─────────────────────────────────────────────────────
 
-function ManualEntryTab({ onClose }) {
+function ManualEntryTab({ onClose, initialDate, initialMerchant, initialAmount }) {
   const { addToast } = useUIStore();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    amount: '',
-    merchant: '',
-    category: 'food',
-    date: new Date().toISOString().split('T')[0],
-    paymentMethod: 'UPI',
+    amount:          initialAmount ? String(initialAmount) : '',
+    merchant:        initialMerchant || '',
+    category:        'food',
+    date:            initialDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }), // YYYY-MM-DD in IST
+    paymentMethod:   'UPI',
     transactionType: 'debit',
-    notes: '',
+    notes:           '',
   });
 
   const update = (patch) => setForm((prev) => ({ ...prev, ...patch }));
@@ -246,10 +246,19 @@ function ManualEntryTab({ onClose }) {
       //     timestamp is accurate (e.g., "29 Mar, 20:54" not "29 Mar, 00:00")
       //   - Otherwise → use noon local time so UTC conversion never rolls the
       //     date backward for IST users (UTC+5:30)
-      const today = new Date().toISOString().split('T')[0];
-      const txnDate = form.date === today
-        ? new Date().toISOString()                          // right now (today's actual time)
-        : new Date(form.date + 'T12:00:00').toISOString(); // noon local for past/future dates
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // IST YYYY-MM-DD
+      let txnDate;
+      if (form.date === today) {
+        // Use the actual current time (already correct, browser/server time)
+        txnDate = new Date().toISOString();
+      } else {
+        // Build noon IST explicitly: parse date parts and subtract IST offset (UTC+5:30 = +330 min)
+        // so that the stored UTC timestamp always maps to the correct IST calendar date.
+        const [year, month, day] = form.date.split('-').map(Number);
+        // noon IST = 12:00:00 IST = 06:30:00 UTC
+        const noonISTasUTC = new Date(Date.UTC(year, month - 1, day, 6, 30, 0));
+        txnDate = noonISTasUTC.toISOString();
+      }
 
       await apiConfirmTransaction({
         amount:          parseFloat(form.amount),
@@ -411,9 +420,11 @@ export default function AddTransactionModal() {
   const { activeModal, modalData, closeModal } = useUIStore();
 
   // Determine initial tab from modal trigger
+  // If a date is pre-set (from Calendar), default to Manual tab
   const initialTab =
     activeModal === 'manual' ? 'manual' :
-    activeModal === 'share'  ? 'share'  : 'sms';
+    activeModal === 'share'  ? 'share'  :
+    (modalData?.date)        ? 'manual' : 'sms';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [parsedResult, setParsedResult] = useState(null);
@@ -511,7 +522,14 @@ export default function AddTransactionModal() {
                   >
                     {activeTab === 'sms'    && <PasteSMSTab onParsed={setParsedResult} />}
                     {activeTab === 'share'  && <ShareTargetTab />}
-                    {activeTab === 'manual' && <ManualEntryTab onClose={handleClose} />}
+                    {activeTab === 'manual' && (
+                      <ManualEntryTab
+                        onClose={handleClose}
+                        initialDate={modalData?.date}
+                        initialMerchant={modalData?.merchant}
+                        initialAmount={modalData?.amount}
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>

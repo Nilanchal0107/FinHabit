@@ -57,6 +57,7 @@ export const formatDate = (date, format = 'short') => {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
+      timeZone: 'Asia/Kolkata',
     }).format(d);
   }
 
@@ -64,6 +65,7 @@ export const formatDate = (date, format = 'short') => {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Asia/Kolkata',
   }).format(d);
 };
 

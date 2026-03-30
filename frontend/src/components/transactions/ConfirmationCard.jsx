@@ -103,9 +103,10 @@ export default function ConfirmationCard({ data, onConfirm, onCancel, isSaving }
   const [category, setCategory] = useState(data.category || 'Others');
   const [payMethod, setPayMethod] = useState(data.paymentMethod || 'UPI');
   const [notes,    setNotes]    = useState('');
-  const [date,     setDate]     = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  // Derive today's date in IST (guards against UTC date being behind IST before 05:30)
+  const [date,     setDate]     = useState(() => {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // 'en-CA' → YYYY-MM-DD
+  });
 
   const confidence = data.confidence ?? 0;
   const isHigh   = confidence >= 0.9;
@@ -128,13 +129,24 @@ export default function ConfirmationCard({ data, onConfirm, onCancel, isSaving }
 
   const handleSave = async () => {
     if (!canSave) return;
+    // If the chosen date is today (IST), use the real current time.
+    // For any other date, anchor to noon IST (06:30 UTC) so UTC storage never
+    // rolls the calendar date backward for IST users.
+    const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+    let txnDate;
+    if (date === todayIST) {
+      txnDate = new Date().toISOString(); // actual current moment
+    } else {
+      const [y, mo, d] = date.split('-').map(Number);
+      txnDate = new Date(Date.UTC(y, mo - 1, d, 6, 30, 0)).toISOString(); // noon IST
+    }
     const result = await onConfirm({
       amount:          parseFloat(amount),
       merchant:        merchant.trim(),
       category,
       paymentMethod:   payMethod,
       transactionType: data.transactionType || 'debit',
-      date:            new Date(date).toISOString(),
+      date:            txnDate,
       notes:           notes.trim() || undefined,
       confidence:      data.confidence,
       tier:            data.tier,
@@ -266,7 +278,7 @@ export default function ConfirmationCard({ data, onConfirm, onCancel, isSaving }
             </div>
             <div className="flex items-center justify-between text-sm font-body">
               <span className="text-text-secondary">Date</span>
-              <span className="text-text-primary">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className="text-text-primary">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}</span>
             </div>
             <div className="flex items-center justify-between text-sm font-body">
               <span className="text-text-secondary">Type</span>

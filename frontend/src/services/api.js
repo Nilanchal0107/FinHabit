@@ -68,9 +68,10 @@ export const confirmTransaction = (transaction) =>
 /**
  * GET /api/insights
  * @param {'weekly'|'monthly'} period
+ * @param {boolean} [force=false] - bypass 6h Firestore cache
  */
-export const fetchInsights = (period) =>
-  request(`/insights?period=${period}`, { method: 'GET' });
+export const fetchInsights = (period, force = false) =>
+  request(`/insights?period=${period}${force ? '&force=true' : ''}`, { method: 'GET' });
 
 /**
  * GET /api/transactions
@@ -104,9 +105,10 @@ export const updateTransaction = (id, updates) =>
  * @param {string} message
  * @param {Array} conversationHistory
  * @param {object} context
+ * @param {AbortSignal} [signal] - optional AbortSignal to cancel the request
  * @returns {Promise<Response>} Raw response with SSE stream
  */
-export const streamChat = async (message, conversationHistory, context) => {
+export const streamChat = async (message, conversationHistory, context, signal) => {
   const user = auth.currentUser;
 
   if (!user) {
@@ -122,6 +124,7 @@ export const streamChat = async (message, conversationHistory, context) => {
       Authorization: `Bearer ${idToken}`,
     },
     body: JSON.stringify({ message, conversationHistory, context }),
+    signal,
   });
 
   if (!response.ok) {

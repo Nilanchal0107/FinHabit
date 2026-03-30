@@ -37,6 +37,34 @@ export const useUIStore = create((set, get) => ({
   setChatOpen: (open) => set({ chatOpen: open }),
   toggleChat: () => set((state) => ({ chatOpen: !state.chatOpen })),
 
+  // Chat store (in-memory, resets on logout)
+  chatHistory: [],
+  isStreaming: false,
+  hasUnread: false,
+
+  addChatMessage: (message) =>
+    set((state) => ({
+      chatHistory: [...state.chatHistory, message],
+    })),
+
+  updateLastAssistantMessage: (content) =>
+    set((state) => {
+      const history = [...state.chatHistory];
+      // Find last assistant message and update its content
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'assistant') {
+          history[i] = { ...history[i], content };
+          break;
+        }
+      }
+      return { chatHistory: history };
+    }),
+
+  setIsStreaming: (streaming) => set({ isStreaming: streaming }),
+  setHasUnread: (unread) => set({ hasUnread: unread }),
+
+  clearChatHistory: () => set({ chatHistory: [], isStreaming: false, hasUnread: false }),
+
   // Active modal (e.g. 'sms-input', 'transaction-confirm', 'category-picker')
   activeModal: null,
   modalData: null,
