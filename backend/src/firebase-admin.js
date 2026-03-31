@@ -1,7 +1,5 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import admin from 'firebase-admin';
+import { config } from './config.js';
 
 let adminApp;
 
@@ -15,11 +13,11 @@ const initFirebaseAdmin = () => {
     return admin.apps[0];
   }
 
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const serviceAccount = JSON.parse(config.FIREBASE_SERVICE_ACCOUNT);
 
   adminApp = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    projectId: process.env.GCP_PROJECT_ID,
+    projectId: config.GCP_PROJECT_ID,
   });
 
   return adminApp;

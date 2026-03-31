@@ -15,13 +15,14 @@
 import { Router }     from 'express';
 import { adminDb }    from '../firebase-admin.js';
 import { sendNotification, buildDailyReminder } from '../services/fcmService.js';
+import { config } from '../config.js';
 
 const router = Router();
 
 router.post('/daily-reminder', async (req, res) => {
   // ── Authenticate Cloud Scheduler request ───────────────────────────────────
   const secret = req.headers['x-scheduler-secret'];
-  if (!secret || secret !== process.env.SCHEDULER_SECRET) {
+  if (!secret || secret !== config.SCHEDULER_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 

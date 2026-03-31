@@ -17,6 +17,7 @@ import Groq          from 'groq-sdk';
 import { authenticate } from '../middleware/auth.js';
 import { adminDb }   from '../firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ const router = Router();
 
 let groqClient = null;
 function getGroq() {
-  if (!groqClient) groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  if (!groqClient) groqClient = new Groq({ apiKey: config.GROQ_API_KEY });
   return groqClient;
 }
 
@@ -35,7 +36,7 @@ function decrypt(enc) {
   if (!ivHex || !authTagHex || !dataHex) throw new Error('Malformed ciphertext');
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
-    Buffer.from(process.env.ENCRYPTION_KEY, 'hex'),
+    Buffer.from(config.ENCRYPTION_KEY, 'hex'),
     Buffer.from(ivHex, 'hex')
   );
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));

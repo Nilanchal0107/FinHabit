@@ -1,5 +1,4 @@
-import dotenv from "dotenv";
-dotenv.config({ path: "./.env" });
+import { config } from './config.js';
 
 import express from 'express';
 import { standardLimiter } from './middleware/rateLimit.js';
@@ -18,7 +17,7 @@ const app = express();
 // Trust the Google Cloud load balancer proxy for rate limiting (X-Forwarded-For)
 app.set('trust proxy', 1);
 
-const PORT = process.env.PORT || 8080;
+const PORT = config.PORT;
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 
@@ -28,12 +27,12 @@ app.use(express.urlencoded({ extended: false }));
 // CORS — allow Firebase Hosting origin in production, any origin in dev
 app.use((req, res, next) => {
   const allowedOrigins = [
-    process.env.FRONTEND_URL,
+    config.FRONTEND_URL,
     'http://localhost:5173',
   ].filter(Boolean);
 
   const origin = req.headers.origin;
-  if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+  if (!origin || allowedOrigins.includes(origin) || config.NODE_ENV !== 'production') {
     res.header('Access-Control-Allow-Origin', origin || '*');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');

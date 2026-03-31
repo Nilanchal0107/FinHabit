@@ -39,6 +39,8 @@ steps:
       - '--set-secrets=ENCRYPTION_KEY=ENCRYPTION_KEY:latest'
       - '--set-secrets=CLOUD_SCHEDULER_SECRET=CLOUD_SCHEDULER_SECRET:latest'
       - '--set-secrets=FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest'
+      # Env vars (not secrets) needed by the server
+      - '--set-env-vars=FRONTEND_URL=https://finhabits.web.app,GCP_PROJECT_ID=finhabits-169df,NODE_ENV=production'
 
 # Store image in Container Registry
 images:

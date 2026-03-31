@@ -14,6 +14,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { authenticate } from '../middleware/auth.js';
 import { adminDb } from '../firebase-admin.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ function decrypt(encryptedText) {
   }
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
-    Buffer.from(process.env.ENCRYPTION_KEY, 'hex'),
+    Buffer.from(config.ENCRYPTION_KEY, 'hex'),
     Buffer.from(ivHex, 'hex')
   );
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
@@ -41,7 +42,7 @@ function decrypt(encryptedText) {
 router.get('/transactions', authenticate, async (req, res) => {
   const userId = req.uid;
 
-  if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length !== 64) {
+  if (!config.ENCRYPTION_KEY || config.ENCRYPTION_KEY.length !== 64) {
     return res.status(500).json({ error: 'Encryption key not configured' });
   }
 

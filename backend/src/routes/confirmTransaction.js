@@ -12,6 +12,7 @@ import { adminDb } from '../firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { updatePattern } from '../services/patternEngine.js';
 import { sendNotification, buildAnomalyAlert } from '../services/fcmService.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ function encrypt(text) {
   const iv = crypto.randomBytes(12); // 12 bytes for GCM
   const cipher = crypto.createCipheriv(
     'aes-256-gcm',
-    Buffer.from(process.env.ENCRYPTION_KEY, 'hex'),
+    Buffer.from(config.ENCRYPTION_KEY, 'hex'),
     iv
   );
   const encrypted = Buffer.concat([
@@ -56,7 +57,7 @@ router.post(
       transactionType = 'debit',
     } = req.body;
 
-    if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length !== 64) {
+    if (!config.ENCRYPTION_KEY || config.ENCRYPTION_KEY.length !== 64) {
       return res.status(500).json({ error: 'Encryption key not configured' });
     }
 
@@ -136,7 +137,7 @@ async function detectAnomaly(userId, transactionId, amount, merchant) {
 
   // Decrypt and sum all debit transactions from last 30 days
   let total30 = 0;
-  const decryptKey = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+  const decryptKey = Buffer.from(config.ENCRYPTION_KEY, 'hex');
 
   for (const docSnap of snap.docs) {
     const data = docSnap.data();

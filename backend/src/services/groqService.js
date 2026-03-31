@@ -4,12 +4,13 @@
  */
 
 import Groq from 'groq-sdk';
+import { config } from '../config.js';
 
 let groqClient = null;
 
 function getGroq() {
   if (!groqClient) {
-    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    groqClient = new Groq({ apiKey: config.GROQ_API_KEY });
   }
   return groqClient;
 }

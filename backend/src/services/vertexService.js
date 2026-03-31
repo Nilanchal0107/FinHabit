@@ -5,6 +5,7 @@
  */
 
 import { VertexAI } from '@google-cloud/vertexai';
+import { config } from '../config.js';
 
 const SYSTEM_PROMPT = `You are a precise financial SMS parser specialized in Indian bank messages. Extract transaction details and return ONLY valid JSON with no explanation or markdown. The JSON must contain: amount (number), merchant (string), category (string), transaction_type ("debit" or "credit"), confidence_score (number 0.0-1.0).
 
@@ -30,7 +31,7 @@ SMS: "${smsText}"`;
  */
 export async function tier3VertexAI(smsText) {
   const vertexAI = new VertexAI({
-    project: process.env.GCP_PROJECT_ID,
+    project: config.GCP_PROJECT_ID,
     location: 'asia-south1', // Mumbai region
   });
 

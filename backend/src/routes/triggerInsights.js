@@ -14,6 +14,7 @@ import Groq          from 'groq-sdk';
 import { adminDb }   from '../firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { sendNotification, buildWeeklySummary, buildMonthlyReport } from '../services/fcmService.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const router = Router();
 
 let groqClient = null;
 function getGroq() {
-  if (!groqClient) groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  if (!groqClient) groqClient = new Groq({ apiKey: config.GROQ_API_KEY });
   return groqClient;
 }
 
@@ -33,7 +34,7 @@ function safeDecrypt(enc) {
     if (!ivHex || !authTagHex || !dataHex) return 0;
     const decipher = crypto.createDecipheriv(
       'aes-256-gcm',
-      Buffer.from(process.env.ENCRYPTION_KEY, 'hex'),
+      Buffer.from(config.ENCRYPTION_KEY, 'hex'),
       Buffer.from(ivHex, 'hex')
     );
     decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
@@ -169,7 +170,7 @@ Respond ONLY with valid JSON (no markdown): {"summary":"...","pattern":"...","ti
 router.post('/trigger-insights', async (req, res) => {
   // Validate secret header
   const secret = req.headers['x-scheduler-secret'];
-  if (!secret || secret !== process.env.SCHEDULER_SECRET) {
+  if (!secret || secret !== config.SCHEDULER_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
