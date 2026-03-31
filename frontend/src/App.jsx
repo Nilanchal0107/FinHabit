@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@services/firebase.js';
 import { useAuthStore } from '@store/authStore.js';
+import { requestNotificationPermission, setupFCMListeners } from '@services/notifications.js';
 
 import Navbar from '@components/common/Navbar.jsx';
 import FAB from '@components/common/FAB.jsx';
@@ -75,6 +76,7 @@ function AppLayout({ children }) {
 
 function AuthListener() {
   const { setUser, clearUser, setLoading } = useAuthStore();
+  const fcmCleanupRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
@@ -88,12 +90,32 @@ function AuthListener() {
             // Profile must exist AND have a 'name' field to be considered complete
             const profileComplete = profileSnap.exists() && !!profileSnap.data()?.name;
             setUser({ ...firebaseUser, isNewUser: !profileComplete });
+
+            // Set up FCM only for users who have completed onboarding
+            if (profileComplete) {
+              // Request permission + save token (non-blocking)
+              requestNotificationPermission(firebaseUser.uid).catch((err) => {
+                console.warn('[FCM] Permission setup error:', err.message);
+              });
+
+              // Set up foreground message listener
+              // Clean up any previous listener first
+              if (fcmCleanupRef.current) {
+                fcmCleanupRef.current();
+              }
+              fcmCleanupRef.current = setupFCMListeners();
+            }
           } catch (err) {
             // Firestore unavailable (permissions, network etc.) — show onboarding to be safe
             console.error('Firestore profile check failed:', err.message);
             setUser({ ...firebaseUser, isNewUser: true });
           }
         } else {
+          // Sign-out: clean up FCM listener
+          if (fcmCleanupRef.current) {
+            fcmCleanupRef.current();
+            fcmCleanupRef.current = null;
+          }
           clearUser();
         }
       },
@@ -102,7 +124,12 @@ function AuthListener() {
         clearUser();
       }
     );
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (fcmCleanupRef.current) {
+        fcmCleanupRef.current();
+      }
+    };
   }, [setUser, clearUser, setLoading]);
 
   return null;

@@ -1,22 +1,22 @@
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --only=production
 
 COPY src ./src
 
 # ── Stage 2: Production Image ─────────────────────────────────────────────────
-FROM node:20-slim AS runner
+FROM node:20-alpine AS runner
 
-# Security: run as non-root
-RUN groupadd -r finhabits && useradd -r -g finhabits finhabits
+# Security: run as non-root user
+RUN addgroup -S finhabits && adduser -S finhabits -G finhabits
 
 WORKDIR /app
 
-# Copy only production node_modules and app source
+# Copy only what's needed at runtime
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
 COPY package.json ./
@@ -30,7 +30,7 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-# Health check (Cloud Run uses this)
+# Health check — Cloud Run uses this to verify container readiness
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:8080/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 

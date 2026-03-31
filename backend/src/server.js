@@ -11,6 +11,7 @@ import updateTransactionRouter from './routes/updateTransaction.js';
 import insightsRouter from './routes/insights.js';
 import triggerInsightsRouter from './routes/triggerInsights.js';
 import chatRouter from './routes/chat.js';
+import dailyReminderRouter from './routes/dailyReminder.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -65,6 +66,7 @@ app.use('/api', updateTransactionRouter);
 app.use('/api', insightsRouter);
 app.use('/api', triggerInsightsRouter);
 app.use('/api', chatRouter);
+app.use('/api', dailyReminderRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

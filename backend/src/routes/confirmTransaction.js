@@ -1,6 +1,7 @@
 /**
  * confirmTransaction.js — POST /api/confirm-transaction
  * Encrypts amount, writes to Firestore, updates pattern learning engine.
+ * Includes anomaly detection: fires FCM alert if spend >2× 30-day average.
  */
 
 import { Router } from 'express';
@@ -10,6 +11,7 @@ import { validate, confirmTransactionSchema } from '../middleware/validate.js';
 import { adminDb } from '../firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { updatePattern } from '../services/patternEngine.js';
+import { sendNotification, buildAnomalyAlert } from '../services/fcmService.js';
 
 const router = Router();
 
@@ -88,6 +90,13 @@ router.post(
         console.error('[updatePattern] Non-fatal error:', err.message);
       });
 
+      // 5. Anomaly detection — non-blocking, runs in background
+      if (transactionType === 'debit') {
+        detectAnomaly(userId, docRef.id, amount, merchant).catch((err) => {
+          console.error('[anomaly-detection] Non-fatal error:', err.message);
+        });
+      }
+
       return res.json({ transactionId: docRef.id, success: true });
     } catch (err) {
       console.error('[confirm-transaction] Error:', err.message);
@@ -95,5 +104,83 @@ router.post(
     }
   }
 );
+
+// ── Anomaly Detection ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch the user's average DAILY debit spend over the last 30 days.
+ * Compare against the new transaction amount.
+ * If amount > 2× average → send FCM alert + flag the transaction.
+ *
+ * @param {string} userId
+ * @param {string} transactionId - Newly created Firestore doc ID
+ * @param {number} amount        - Plaintext transaction amount
+ * @param {string} merchant
+ */
+async function detectAnomaly(userId, transactionId, amount, merchant) {
+  const ANOMALY_MULTIPLIER = 2;
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const snap = await adminDb
+    .collection('users')
+    .doc(userId)
+    .collection('transactions')
+    .where('transactionType', '==', 'debit')
+    .where('date', '>=', thirtyDaysAgo)
+    .limit(300)
+    .get();
+
+  if (snap.empty) return; // No history — skip
+
+  // Decrypt and sum all debit transactions from last 30 days
+  let total30 = 0;
+  const decryptKey = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data();
+    try {
+      const enc = data.amount || '';
+      const [ivHex, authTagHex, dataHex] = enc.split(':');
+      if (!ivHex || !authTagHex || !dataHex) continue;
+      const decipher = crypto.createDecipheriv('aes-256-gcm', decryptKey, Buffer.from(ivHex, 'hex'));
+      decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+      const plain = Buffer.concat([
+        decipher.update(Buffer.from(dataHex, 'hex')),
+        decipher.final(),
+      ]).toString('utf8');
+      const val = parseFloat(plain);
+      if (!isNaN(val)) total30 += val;
+    } catch {
+      // Skip undecryptable entries
+    }
+  }
+
+  // Average daily spend (30 days)
+  const avgDaily = total30 / 30;
+
+  if (avgDaily <= 0) return; // No meaningful baseline
+
+  const multiplier = amount / avgDaily;
+
+  if (multiplier >= ANOMALY_MULTIPLIER) {
+    // Flag the transaction in Firestore
+    await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('transactions')
+      .doc(transactionId)
+      .update({ isAnomaly: true });
+
+    // Send FCM notification
+    await sendNotification(
+      userId,
+      buildAnomalyAlert(amount, merchant, multiplier)
+    );
+
+    console.log(`[anomaly-detection] Alert sent to ${userId} — ₹${amount} at ${merchant} (${multiplier.toFixed(1)}× avg)`);
+  }
+}
 
 export default router;

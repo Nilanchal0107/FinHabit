@@ -1,203 +1,346 @@
-# FinHabits
+# FinHabits 2.0
 
-FinHabits is a full-stack personal finance app that helps users track spending from bank SMS messages.
+> AI-powered, semi-automated personal finance PWA for Indian users — built for the **Google Solution Challenge 2026**.
 
-It includes:
-- A React + Vite frontend for dashboarding, transaction management, and insights.
-- A Node.js + Express backend that parses SMS text with a tiered AI pipeline and stores transactions in Firestore.
-- Firebase Auth-based authentication and secure backend APIs.
+FinHabits turns bank SMS notifications into structured expense data via a 4-tier AI parsing pipeline. Users share a received SMS, get an AI-categorised transaction in <1 second, confirm with one tap, and over time the app auto-fills repeat merchants with learned patterns.
 
-## Monorepo Structure
+---
 
-```text
-Finhabits/
-├─ backend/    # Express API, SMS parser pipeline, Firestore writes/reads
-└─ frontend/   # React app (Vite + Tailwind + Zustand + React Query)
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  FRONTEND  (Purple layer)                                        │
+│  React 18 + Vite + Tailwind + Zustand + TanStack Query          │
+│  Deployed: Firebase Hosting                                      │
+│  PWA: Web Share Target — share SMS → opens FinHabits            │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │ HTTPS (Firebase ID token)
+┌────────────────────────────▼─────────────────────────────────────┐
+│  BACKEND  (Teal layer)                                           │
+│  Node.js 20 + Express + Firebase Admin SDK                       │
+│  Deployed: Google Cloud Run (asia-south1)                        │
+│                                                                  │
+│  4-Tier SMS Parsing Pipeline:                                    │
+│  Tier 0 → Pattern Engine (Firestore, ~5ms, confidence: 1.0)     │
+│  Tier 1 → Regex Engine  (~50ms, 20+ Indian bank patterns)       │
+│  Tier 2 → Groq Llama 3.1 70B (~800ms)                          │
+│  Tier 3 → Vertex AI Gemini 1.5 Flash (fallback, always returns) │
+└───────────────┬──────────────────────────┬───────────────────────┘
+                │                          │
+┌───────────────▼──────┐     ┌─────────────▼──────────────────────┐
+│  DATABASE  (Amber)   │     │  AI  (Coral)                        │
+│  Firebase Firestore  │     │  Groq Cloud — Llama 3.1 70B        │
+│  AES-256-GCM at rest │     │  Vertex AI — Gemini 1.5 Flash      │
+│  Firebase Auth       │     │  Firebase Remote Config             │
+└──────────────────────┘     └─────────────────────────────────────┘
 ```
 
-## Tech Stack
+---
 
-### Frontend
-- React 18
-- Vite 5
-- Tailwind CSS
-- Zustand
-- TanStack React Query
-- Firebase Web SDK
-- Recharts
+## Repository Structure
 
-### Backend
-- Node.js 20+
-- Express 4
-- Firebase Admin SDK
-- Zod validation
-- Groq SDK (Llama 3.1 70B)
-- Google Vertex AI SDK (Gemini 1.5 Flash)
+```
+Finhabits/
+├── frontend/                    # React PWA (Vite)
+│   ├── public/
+│   │   ├── manifest.json        # PWA manifest (Web Share Target)
+│   │   ├── firebase-messaging-sw.js
+│   │   └── icons/               # 192.png, 512.png (maskable)
+│   ├── src/
+│   │   ├── components/          # UI components
+│   │   ├── pages/               # Route-level pages
+│   │   ├── store/               # Zustand stores
+│   │   ├── hooks/               # React Query + custom hooks
+│   │   ├── services/            # Firebase, API client
+│   │   └── utils/               # Helpers, formatters
+│   ├── vite.config.js           # Vite + PWA plugin config
+│   └── tailwind.config.js
+│
+├── backend/                     # Express API (Cloud Run)
+│   ├── src/
+│   │   ├── server.js            # Express app entry point
+│   │   ├── firebase-admin.js    # Admin SDK init
+│   │   ├── routes/              # /parse-sms, /confirm-transaction, etc.
+│   │   ├── services/            # SMS parser, encryption, Groq, Vertex AI
+│   │   ├── middleware/          # Auth, rate limiting, validation
+│   │   └── utils/               # Prompts, helpers
+│   └── Dockerfile               # Multi-stage, non-root, node:20-alpine
+│
+├── firebase.json                # Firebase Hosting + Firestore deploy config
+├── firestore.rules              # Firestore security rules
+├── cloudbuild.yaml              # Cloud Build CI/CD pipeline
+├── scheduler-setup.sh           # One-time Cloud Scheduler job registration
+└── README.md
+```
 
-## How It Works (SMS Parsing Pipeline)
+---
 
-The backend parses SMS text using a multi-tier strategy:
-1. Tier 1 regex parsing for speed and structured extraction.
-2. Tier 0 temporal pattern matching using user history (if Tier 1 gives usable signal).
-3. Tier 2 Groq fallback for medium-confidence regex outcomes.
-4. Tier 3 Vertex AI fallback as last resort.
+## Local Development Setup
 
-The final parsed result is confirmed by the user and then stored.
+### Prerequisites
 
-## Prerequisites
+- Node.js 20 LTS — [nodejs.org](https://nodejs.org)
+- Firebase project with **Authentication** (Google + Phone OTP) and **Firestore** enabled
+- [Groq API key](https://console.groq.com) (free tier available)
+- Google Cloud project with **Vertex AI API** enabled (for Tier 3 fallback)
 
-- Node.js 20 or newer
-- npm 9+
-- Firebase project with Auth + Firestore enabled
-- Groq API key (for tier 2 parser)
-- Google Cloud project with Vertex AI access (for tier 3 parser)
-
-## Setup
-
-Install dependencies in both apps:
+### 1. Clone and install
 
 ```bash
-cd backend
-npm install
+git clone https://github.com/YOUR_ORG/finhabits.git
+cd finhabits
 
-cd ../frontend
-npm install
+# Install backend dependencies
+cd backend && npm install
+
+# Install frontend dependencies
+cd ../frontend && npm install
 ```
 
-## Environment Variables
+### 2. Configure environment variables
 
-### Backend (`backend/.env`)
+#### Backend — `backend/.env`
 
 ```env
-# Server
+# ── Server ──────────────────────────────────────────────────────
 PORT=8080
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
-# Security (64-char hex key for AES-256-GCM)
-ENCRYPTION_KEY=your_64_character_hex_key
+# ── Encryption (generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") ──
+ENCRYPTION_KEY=your_64_hex_character_key_here
 
-# Firebase Admin
-FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
+# ── Firebase Admin SDK ───────────────────────────────────────────
+# Paste the full JSON from Firebase Console → Project Settings → Service Accounts
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"..."}
 GCP_PROJECT_ID=your-gcp-project-id
 
-# AI providers
-GROQ_API_KEY=your-groq-api-key
+# ── AI Providers ─────────────────────────────────────────────────
+GROQ_API_KEY=gsk_...
 
-# Optional (used in health response on cloud)
-CLOUD_RUN_REGION=asia-south1
+# ── Cloud Scheduler Auth ─────────────────────────────────────────
+# Must match the x-scheduler-secret header sent by Cloud Scheduler
+CLOUD_SCHEDULER_SECRET=your_random_32_char_secret
 ```
 
-Notes:
-- `ENCRYPTION_KEY` must be exactly 64 hex characters.
-- `FIREBASE_SERVICE_ACCOUNT` is expected as JSON string.
-
-### Frontend (`frontend/.env`)
+#### Frontend — `frontend/.env.local`
 
 ```env
-# API base URL (defaults to /api if omitted)
+# ── Firebase Web SDK (from Firebase Console → Project Settings → General) ──
+VITE_FIREBASE_API_KEY=AIza...
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:abc123
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
+
+# ── Backend API ──────────────────────────────────────────────────
 VITE_API_URL=http://localhost:8080/api
 
-# Firebase Web SDK config
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
-
-# Optional
-VITE_FIREBASE_VAPID_KEY=...
-VITE_USE_EMULATORS=false
+# ── FCM (from Firebase Console → Project Settings → Cloud Messaging) ──
+VITE_FIREBASE_VAPID_KEY=BNxyz...
 ```
 
-## Run Locally
-
-Run backend:
+### 3. Run locally
 
 ```bash
+# Terminal 1 — Backend (http://localhost:8080)
 cd backend
 npm run dev
-```
 
-Run frontend (in another terminal):
-
-```bash
+# Terminal 2 — Frontend (http://localhost:5173)
 cd frontend
 npm run dev
 ```
 
-Default local URLs:
-- Frontend: `http://localhost:5173`
-- Backend health check: `http://localhost:8080/health`
+---
 
-## Available Scripts
+## Environment Variables Reference
 
-### Backend
-- `npm run dev` - start backend with file watch
-- `npm start` - start backend in normal mode
+| Variable | Location | Description |
+|---|---|---|
+| `PORT` | Backend | Server port (injected by Cloud Run, default 8080) |
+| `NODE_ENV` | Backend | `development` or `production` |
+| `FRONTEND_URL` | Backend | CORS allowed origin |
+| `ENCRYPTION_KEY` | Backend | 64 hex chars (32 bytes) for AES-256-GCM |
+| `FIREBASE_SERVICE_ACCOUNT` | Backend | Firebase Admin SDK JSON (stringified) |
+| `GCP_PROJECT_ID` | Backend | Google Cloud project ID |
+| `GROQ_API_KEY` | Backend | Groq Cloud API key (stored in Secret Manager in prod) |
+| `CLOUD_SCHEDULER_SECRET` | Backend | Auth header value for `/api/trigger-insights` |
+| `VITE_FIREBASE_API_KEY` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_PROJECT_ID` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_APP_ID` | Frontend | Firebase Web SDK |
+| `VITE_FIREBASE_MEASUREMENT_ID` | Frontend | Firebase Analytics (optional) |
+| `VITE_API_URL` | Frontend | Backend API base URL |
+| `VITE_FIREBASE_VAPID_KEY` | Frontend | FCM push notification VAPID key |
 
-### Frontend
-- `npm run dev` - start Vite dev server
-- `npm run build` - production build
-- `npm run preview` - preview production build locally
-- `npm run lint` - run ESLint
+> **Production**: All backend secrets are stored in **Google Cloud Secret Manager** and injected at Cloud Run runtime via `--set-secrets`. Never use `.env` in production.
 
-## API Endpoints (Current)
+---
 
-Base URL: `/api`
+## API Endpoints
 
-- `POST /api/parse-sms`
-  - Auth required (Firebase ID token)
-  - Body: `{ smsText, sender? }`
-  - Returns parsed transaction fields (`amount`, `merchant`, `category`, `transactionType`, `paymentMethod`, `confidence`, `tier`).
+Base URL: `https://YOUR_CLOUD_RUN_URL/api`
 
-- `POST /api/confirm-transaction`
-  - Auth required
-  - Persists transaction to Firestore
-  - Encrypts amount using AES-256-GCM before storing
+All endpoints require `Authorization: Bearer <firebase-id-token>` except `/health` and `/api/trigger-insights`.
 
-- `GET /api/transactions?period=month|all&limit=200`
-  - Auth required
-  - Returns decrypted transactions for client display
+### `POST /api/parse-sms`
+Parse a bank SMS message through the 4-tier AI pipeline.
+- **Rate limit**: 10 requests/minute per user
+- **Body**: `{ smsText: string, sender?: string }`
+- **Response**: `{ amount, merchant, category, confidence, tier, transactionType, paymentMethod }`
 
-- `GET /health`
-  - Service health/status endpoint
+### `POST /api/confirm-transaction`
+Save a confirmed (or user-edited) transaction to Firestore.
+- **Body**: `{ amount, merchant, category, date, paymentMethod, originalSMS?, notes? }`
+- **Logic**: Encrypts `amount` with AES-256-GCM → Writes to Firestore → Updates patterns
+- **Response**: `{ transactionId, success }`
 
-## Authentication
+### `GET /api/transactions`
+Fetch and decrypt transactions for the authenticated user.
+- **Query**: `?period=month|all&limit=200`
+- **Response**: Array of decrypted transaction objects
 
-All protected backend endpoints require:
+### `DELETE /api/transactions/:id`
+Delete a transaction by ID.
 
-```http
-Authorization: Bearer <firebase-id-token>
+### `PATCH /api/transactions/:id`
+Update transaction fields (category, notes, merchant).
+
+### `GET /api/insights`
+Get AI-generated financial insights.
+- **Query**: `?period=weekly|monthly`
+- **Response**: `{ summary, recommendations, trends }`
+
+### `POST /api/chat`
+AI finance chatbot via Server-Sent Events streaming.
+- **Body**: `{ message: string, conversationHistory: array, context: object }`
+- **Response**: SSE stream (`data: {"text": "..."}` → `data: [DONE]`)
+
+### `POST /api/trigger-insights`
+Trigger bulk insight generation (Cloud Scheduler only).
+- **Auth**: `x-scheduler-secret` header (not Firebase JWT)
+- **Body**: `{ period: "weekly" | "monthly" }`
+
+### `GET /health`
+Service health check — no auth required.
+- **Response**: `{ status: "ok", version, region, timestamp }`
+
+---
+
+## Deployment
+
+### Backend → Google Cloud Run
+
+#### One-time setup
+
+```bash
+# Enable required GCP APIs
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com
+
+# Store secrets in Cloud Secret Manager
+echo -n "your-groq-api-key" | gcloud secrets create GROQ_API_KEY --data-file=-
+echo -n "your-64-hex-encryption-key" | gcloud secrets create ENCRYPTION_KEY --data-file=-
+echo -n "your-scheduler-secret" | gcloud secrets create CLOUD_SCHEDULER_SECRET --data-file=-
+cat path/to/serviceAccountKey.json | gcloud secrets create FIREBASE_SERVICE_ACCOUNT --data-file=-
+
+# Grant Cloud Build access to secrets
+gcloud secrets add-iam-policy-binding GROQ_API_KEY \
+  --member="serviceAccount:YOUR_PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+# (repeat for other secrets)
 ```
 
-The frontend obtains this token from the current Firebase-authenticated user and sends it automatically.
+#### Deploy via Cloud Build
 
-## Security Notes
+```bash
+# From repo root — triggers cloudbuild.yaml
+gcloud builds submit --project=YOUR_PROJECT_ID
+```
 
-- Raw SMS text is not persisted by parser routes.
-- Transaction amount is encrypted at rest with AES-256-GCM.
-- API uses request validation (Zod) and rate limiting middleware.
+The pipeline will:
+1. Build the Docker image from `backend/Dockerfile`
+2. Push to Google Container Registry
+3. Deploy to Cloud Run (`asia-south1`, min 0, max 10 instances, 512Mi memory)
+4. Inject all secrets from Secret Manager at runtime
 
-## Deployment Notes
+### Frontend → Firebase Hosting
 
-A production Dockerfile is provided for the backend at `backend/Dockerfile`:
-- Multi-stage build
-- Non-root runtime user
-- Built-in healthcheck for `/health`
-- Suitable for Cloud Run-style deployments
+```bash
+# Install Firebase CLI (if not already)
+npm install -g firebase-tools
+firebase login
 
-## Troubleshooting
+# Build the frontend
+cd frontend
+npm run build
 
-- 401 Unauthorized:
-  - Ensure the user is signed in and Firebase token is valid.
-- 500 Encryption key not configured:
-  - Verify backend `ENCRYPTION_KEY` exists and has 64 hex chars.
-- SMS parse fallback behavior:
-  - If regex and Groq confidence are low, Vertex AI fallback is used.
+# Deploy from repo root
+cd ..
+firebase deploy --only hosting
+```
+
+To deploy Firestore rules and hosting together:
+```bash
+firebase deploy --only firestore,hosting
+```
+
+### Cloud Scheduler (run once after Cloud Run is deployed)
+
+```bash
+# Set your values and run the setup script
+export CLOUD_RUN_URL="https://finhabits-backend-xxxx-el.a.run.app"
+export SCHEDULER_SECRET="your_cloud_scheduler_secret"
+chmod +x scheduler-setup.sh
+./scheduler-setup.sh
+```
+
+This creates 3 jobs in `asia-south1`:
+| Job | Schedule (IST) | Endpoint |
+|---|---|---|
+| `finhabits-weekly-insights` | 9 AM every Monday | `POST /api/trigger-insights` |
+| `finhabits-monthly-insights` | 9 AM 1st of month | `POST /api/trigger-insights` |
+| `finhabits-daily-reminder` | 9 PM daily | `POST /api/send-reminders` |
+
+---
+
+## Security
+
+- **AES-256-GCM** — all financial amounts encrypted at rest in Firestore (never plaintext)
+- **Firebase JWT** — every protected API endpoint verifies tokens server-side
+- **Cloud Secret Manager** — no secrets in environment files or Docker images in production
+- **Non-root container** — backend runs as `finhabits` user inside Docker
+- **Rate limiting** — 10 SMS parses/minute per user via `express-rate-limit`
+- **Firestore rules** — strict user isolation (users can only access their own data)
+- **Raw SMS never stored** — SMS text is discarded after parsing; only structured fields are persisted
+
+---
+
+## PWA Features
+
+- **Web Share Target** — Share a bank SMS from any Android app → FinHabits opens and auto-parses it
+- **Push Notifications** — FCM reminders when no transactions logged today (9 PM IST)
+- **Offline support** — Workbox caches static assets and Google Fonts (CacheFirst, 1 year TTL)
+- **Installable** — Add to Home Screen on Android Chrome and iOS Safari
+
+---
+
+## Confidence Thresholds & AI Tiers
+
+| Threshold | Value | Behaviour |
+|---|---|---|
+| Tier 0 autofill | ≥5 confirmations | Auto-save, skip all AI tiers |
+| High confidence | ≥0.90 | One-tap save prompt |
+| Medium confidence | 0.70–0.89 | "Is this correct?" review |
+| Low confidence | <0.70 | Full category picker shown |
+
+---
 
 ## License
 
-Add your preferred license here.
+MIT License — see [LICENSE](LICENSE) for details.

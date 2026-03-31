@@ -1,0 +1,49 @@
+steps:
+  # ── Step 1: Build Docker image ──────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/finhabits-backend'
+      - './backend'
+
+  # ── Step 2: Push to Container Registry ──────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    waitFor: ['build-image']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/finhabits-backend'
+
+  # ── Step 3: Deploy to Cloud Run ──────────────────────────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    waitFor: ['push-image']
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'finhabits-backend'
+      - '--image=gcr.io/$PROJECT_ID/finhabits-backend'
+      - '--region=asia-south1'
+      - '--platform=managed'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--concurrency=80'
+      - '--allow-unauthenticated'
+      # Secrets injected from Google Cloud Secret Manager — no plaintext in YAML
+      - '--set-secrets=GROQ_API_KEY=GROQ_API_KEY:latest'
+      - '--set-secrets=ENCRYPTION_KEY=ENCRYPTION_KEY:latest'
+      - '--set-secrets=CLOUD_SCHEDULER_SECRET=CLOUD_SCHEDULER_SECRET:latest'
+      - '--set-secrets=FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest'
+
+# Store image in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/finhabits-backend'
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useUIStore } from '@store/uiStore.js';
 
@@ -8,12 +9,19 @@ const TYPE_STYLES = {
   info:    { border: '#4F46E5', icon: 'ℹ', iconBg: 'rgba(79,70,229,0.15)' },
 };
 
-function ToastItem({ toast }) {
+/**
+ * ToastItem must use React.forwardRef so that AnimatePresence mode="popLayout"
+ * can attach its layout-measurement ref to the DOM node. Without forwardRef,
+ * React warns "Function components cannot be given refs" and the layout
+ * animation is skipped.
+ */
+const ToastItem = forwardRef(function ToastItem({ toast }, ref) {
   const { removeToast } = useUIStore();
   const style = TYPE_STYLES[toast.type] || TYPE_STYLES.info;
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, x: 48, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -56,7 +64,7 @@ function ToastItem({ toast }) {
       </button>
     </motion.div>
   );
-}
+});
 
 export default function Toast() {
   const { toasts } = useUIStore();

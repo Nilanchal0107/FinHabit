@@ -13,6 +13,7 @@ import crypto        from 'crypto';
 import Groq          from 'groq-sdk';
 import { adminDb }   from '../firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { sendNotification, buildWeeklySummary, buildMonthlyReport } from '../services/fcmService.js';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ function resolveDate(val) {
 
 // ── Generate insight for a single user ───────────────────────────────────────
 
-async function generateForUser(uid) {
+async function generateForUser(uid, period = 'weekly') {
   const now  = new Date();
   const from = new Date(now.getTime() - 7 * 86_400_000);
   const comparefrom = new Date(from.getTime() - 7 * 86_400_000);
@@ -144,7 +145,7 @@ Respond ONLY with valid JSON (no markdown): {"summary":"...","pattern":"...","ti
     pattern:          parsed.pattern        || '',
     tip:              parsed.tip            || '',
     estimatedSaving:  Number(parsed.estimatedSaving) || 0,
-    period:           'weekly',
+    period,
     totalSpend:       Math.round(total),
     changePercent,
     categoryBreakdown: catBreakdown,
@@ -152,7 +153,15 @@ Respond ONLY with valid JSON (no markdown): {"summary":"...","pattern":"...","ti
     generatedAt:      FieldValue.serverTimestamp(),
   });
 
-  return true;
+  // Send FCM notification with the total spend
+  const notification =
+    period === 'monthly'
+      ? buildMonthlyReport(total, now.toLocaleString('en-IN', { month: 'long' }))
+      : buildWeeklySummary(total);
+
+  await sendNotification(uid, notification);
+
+  return { sent: true, total: Math.round(total) };
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -163,6 +172,11 @@ router.post('/trigger-insights', async (req, res) => {
   if (!secret || secret !== process.env.SCHEDULER_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+
+  // Determine period from optional query/body param (default: weekly)
+  const period = (req.body?.period || req.query?.period || 'weekly').toLowerCase();
+  const validPeriods = ['weekly', 'monthly'];
+  const insightPeriod = validPeriods.includes(period) ? period : 'weekly';
 
   try {
     // Get all users who have at least one transaction
@@ -177,8 +191,8 @@ router.post('/trigger-insights', async (req, res) => {
       await Promise.all(
         batch.map(async (userRef) => {
           try {
-            const result = await generateForUser(userRef.id);
-            if (result) processed++;
+            const result = await generateForUser(userRef.id, insightPeriod);
+            if (result?.sent) processed++;
           } catch (err) {
             console.error(`[trigger-insights] Failed for uid ${userRef.id}:`, err.message);
             errors++;
@@ -187,7 +201,7 @@ router.post('/trigger-insights', async (req, res) => {
       );
     }
 
-    return res.json({ success: true, processed, errors });
+    return res.json({ success: true, period: insightPeriod, processed, errors });
   } catch (err) {
     console.error('[POST /trigger-insights] Error:', err.message);
     return res.status(500).json({ error: 'Trigger failed' });

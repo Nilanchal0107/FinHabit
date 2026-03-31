@@ -113,6 +113,6 @@ export const requestNotificationPermission = async () => {
  * @returns {Function} Unsubscribe function.
  */
 export const onForegroundMessage = (callback) => {
-  if (!messaging) return () => {};
+  if (!messaging) return () => { };
   return onMessage(messaging, callback);
 };

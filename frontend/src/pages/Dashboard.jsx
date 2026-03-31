@@ -165,7 +165,7 @@ export default function Dashboard() {
             />
           )}
           <button
-            onClick={() => {/* future: open notifications panel */}}
+            onClick={() => {/* future: open notifications panel */ }}
             className="w-8 h-8 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)' }}
             aria-label="Notifications"

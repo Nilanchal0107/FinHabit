@@ -93,10 +93,9 @@ export default function TransactionItem({ txn, categoryIcon, onTap, onDeleteRequ
         className="absolute inset-0 flex items-center justify-end rounded-xl"
       >
         <motion.button
-          style={{ x: deleteX }}
+          style={{ x: deleteX, color: '#F43F5E' }}
           onClick={handleDeleteClick}
           className="flex items-center gap-1.5 pr-4 font-body text-sm font-semibold"
-          style={{ color: '#F43F5E', x: deleteX }}
         >
           🗑️ Delete
         </motion.button>
@@ -115,12 +114,11 @@ export default function TransactionItem({ txn, categoryIcon, onTap, onDeleteRequ
         drag="x"
         dragConstraints={{ left: -MAX_DRAG, right: MAX_DRAG }}
         dragElastic={0.05}
-        style={{ x }}
+        style={{ x, backgroundColor: '#16162A', touchAction: 'pan-y' }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleTap}
         className="relative flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer select-none"
-        style={{ backgroundColor: '#16162A', touchAction: 'pan-y' }}
         whileTap={{ scale: 0.99 }}
         id={`txn-item-${txn.id}`}
       >
