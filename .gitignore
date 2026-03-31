@@ -43,9 +43,11 @@ frontend/vite.config.js.timestamp-*.mjs
 
 # ── Firebase local config (project-specific, not for CI) ─────────────────────
 .firebaserc
+.firebase/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+empty-site/
 # Service account key files
 *firebase-adminsdk*.json
 *serviceAccountKey*.json

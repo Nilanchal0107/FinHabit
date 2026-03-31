@@ -14,6 +14,10 @@ import chatRouter from './routes/chat.js';
 import dailyReminderRouter from './routes/dailyReminder.js';
 
 const app = express();
+
+// Trust the Google Cloud load balancer proxy for rate limiting (X-Forwarded-For)
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 8080;
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────

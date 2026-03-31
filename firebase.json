@@ -3,6 +3,7 @@
     "rules": "firestore.rules"
   },
   "hosting": {
+    "target": "app",
     "public": "frontend/dist",
     "ignore": [
       "firebase.json",
@@ -19,27 +20,45 @@
       {
         "source": "/firebase-messaging-sw.js",
         "headers": [
-          { "key": "Service-Worker-Allowed", "value": "/" },
-          { "key": "Cache-Control", "value": "no-cache" }
+          {
+            "key": "Service-Worker-Allowed",
+            "value": "/"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
         ]
       },
       {
         "source": "/firebase-sw-config.js",
         "headers": [
-          { "key": "Service-Worker-Allowed", "value": "/" },
-          { "key": "Cache-Control", "value": "no-store" }
+          {
+            "key": "Service-Worker-Allowed",
+            "value": "/"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
         ]
       },
       {
         "source": "/manifest.json",
         "headers": [
-          { "key": "Cache-Control", "value": "no-cache" }
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
         ]
       },
       {
         "source": "**/*.@(js|css|png|svg|woff2)",
         "headers": [
-          { "key": "Cache-Control", "value": "max-age=31536000" }
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
         ]
       }
     ]
